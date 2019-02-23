@@ -1,0 +1,328 @@
+---
+title: "Analysis - San Francisco Fire Department Calls For Service"
+author: "Steven De La Fuente "
+date: "12/10/2018"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(sf)
+library(stringr)
+```
+
+Introduction
+
+This exploritory analysis is the first step toward achieving a larger project goal of improving theoretical availability and utilization rates of San Francisco Fire Department services. San Francisco faces many social challenges similar to other rapidly devoloping cities. Today socio-economic disparity has become evident in nearly every neighborhood of the city. Maintaing and improving departmental services may lead to future quality of life and resiliancy improvements among the cities most vulnerable populations. 
+
+Objective 
+
+  - Conduct spatiotemporal analysis of San Francisco Fire Department calls for       service occuring within the year of 2016. 
+  - Discover and understand common statistics such as, incident type, response time and fequency related to unique units, stations and neighborhoods within the city.
+  - Manipulate derivitive values from the established dataset, leading to interesting and informative geospatial insights.
+  -Establish a baseline, aimed at improving project scope and direction.
+
+Data
+
+  -Data Repository : https://datasf.org/opendata/
+    * Fire Department Calls for Service 
+    https://data.sfgov.org/Public-Safety/Fire-Department-Calls-for-Service/nuek-vuh3
+    
+    * Analysis Neighborhoods Shapefile
+    https://data.sfgov.org/Geographic-Locations-and-Boundaries/Analysis-Neighborhoods/p5b7-5n3h
+
+Packages used
+
+  - library(tidyr, ggplot2, dplyr, lubridate, stringr, sf)
+  
+
+San Francisco Fire Department, Calls for Service dataset.
+
+```{r}
+data <- read.csv(file= "/Users/Steve/Dropbox/ucsc/data_analysis/project/Fire_Department_Calls_for_Service_2016.csv")
+```
+
+
+Shapefile deliniating neighborhood boundarys.
+
+```{r}
+sfn_shp <- st_read('/Users/steve/Downloads/sf_nhoods/geo_export_b43d0be8-0ef5-421a-8fa0-204489a90d6b.shp')
+```
+
+-Analysis
+
+```{r}
+str(data)
+```
+
+```{r}
+summary(data)
+```
+
+```{r}
+call_type_distribution <- data %>%
+  group_by(Call.Type) %>%
+  summarise(Percent =((n_distinct(Incident.Number)/
+                         n_distinct(data$Incident.Number)*100)))
+
+ggplot(data=call_type_distribution , aes(x=Call.Type, y=Percent)) +
+  geom_bar(stat="identity")+theme(axis.text.x = element_text(angle = 45, 
+                                                             hjust = 1)) +
+  ggtitle("Call Type Distribution")
+
+```
+
+Medical incidents accounted for over 75% of responses in 2016. This is consistant with national fire department response statistics. Below is a table that more accurattly displays San Francisco Fire Department response type distrabution. 
+
+```{r}
+
+head(call_type_distribution%>%arrange(desc(Percent)),10)
+
+```
+
+
+Summary of total coll volume by neighborhood, decsending order. Neighborhoods near the city center experiance relativly higher call volumes when compaired to other areas of the city. 
+
+```{r} 
+Neiborhood_call_volume <- data%>%group_by(Neighborhooods...Analysis.Boundaries) %>%
+ rename(nhood = Neighborhooods...Analysis.Boundaries) %>%
+  summarise(count = n_distinct(Incident.Number))
+
+Neiborhood_call_volume %>% arrange(desc(Neiborhood_call_volume$count)) %>% print(n=Inf)
+```
+
+```{r}
+Neiborhood_call_volume <- data%>%group_by(Neighborhooods...Analysis.Boundaries) %>%
+ rename(nhood = Neighborhooods...Analysis.Boundaries) %>%
+  summarise(count = n_distinct(Incident.Number))
+
+ggplot(data=Neiborhood_call_volume , 
+       aes(x=nhood , y=count)) +
+  geom_bar(stat="identity")+theme(axis.text.x = element_text(angle = 45, 
+                                                             hjust = 1)) +
+  ggtitle('Neighborhood Call Volume') +
+  labs(x='Neighborhood', y = 'Count')
+
+```
+
+```{r,warning=FALSE, message=FALSE}
+neighborhood_call_shp <- inner_join(sfn_shp,Neiborhood_call_volume)
+ggplot(neighborhood_call_shp) + geom_sf(aes(fill=count)) +
+  scale_fill_gradient(low = 'green',high = 'red' )+
+  ggtitle('Neighborhood Call Volume')
+```
+
+Downtown companies have consistanly ranked among the busiest in the Nation.
+
+```{r,warning=FALSE}
+station_call_volume <- data %>%
+  group_by(Station.Area) %>%
+  summarise(count = n_distinct(Incident.Number))
+
+ggplot(data=station_call_volume , aes(x=Station.Area, y=count)) +
+  geom_bar(stat="identity")+theme(axis.text.x = element_text(angle = 45, 
+                                                             hjust = 1)) +
+  ggtitle('Station Call Volume') + labs(x = 'Station',y='Count')
+
+```
+
+Engine truck and Ambulance companies form the main response contingency of the department. These units contain a diverse set of tools and capabilities, requiring specialized training. Many departmental members are cross trained and are capable of preforming essential duties on any unit.
+
+Engine companies respond to almost every type of emergency, provide basic and advanced medical care and are typicly assisgned to fire attack operations. 
+
+Truck companies are the largest fire department apparatus, cary a vast array of specialised forcible entry tools and a large assortment of ladders needed to preform search and rescue operations. 
+
+Ambulance or "Medic" companies are staffed with paramedics and provide medical care and transport. 
+
+```{r}
+engine_call_volume <- data %>% filter(Unit.Type == 'ENGINE') %>%
+  group_by(Unit.ID) %>%
+  summarise(count = n_distinct(Incident.Number))
+
+ggplot(data=engine_call_volume , aes(x=Unit.ID, y=count)) +
+  geom_bar(stat="identity")+theme(axis.text.x = element_text(angle = 45, 
+                                                             hjust = 1)) +
+  ggtitle('Engine Call Volume') + labs(x= 'Unit ID', y='Count')
+
+```
+
+```{r}
+truck_call_volume <- data %>% filter(Unit.Type == 'TRUCK') %>%
+  group_by(Unit.ID) %>%
+  summarise(count = n_distinct(Incident.Number))
+
+ggplot(data=truck_call_volume , aes(x=Unit.ID, y=count)) +
+  geom_bar(stat="identity")+theme(axis.text.x = element_text(angle = 45, 
+                                                             hjust = 1)) +
+  ggtitle("Truck Call Volume") + labs(x= 'Unit ID', y='Count')
+
+```
+
+```{r}
+medic_call_volume <- data %>% filter(Unit.Type == 'MEDIC') %>%
+  group_by(Unit.ID) %>%
+  summarise(count = n_distinct(Incident.Number))
+
+ggplot(data=medic_call_volume , aes(x=Unit.ID, y=count)) +
+  geom_bar(stat="identity")+theme(axis.text.x = element_text(angle = 45, 
+                                                             hjust = 1)) +
+  ggtitle("Ambulance Call Volume") + labs(x= 'Unit ID', y='Count')
+
+```
+
+
+
+```{r}
+fire_volume <- data %>% rename(nhood = Neighborhooods...Analysis.Boundaries) %>% 
+  filter(data$Call.Type == 'Structure Fire') %>% group_by(nhood) %>%
+  summarise(count = n_distinct(Incident.Number))
+
+
+fire_volume_shp <- inner_join(sfn_shp,fire_volume)
+ggplot(fire_volume_shp) + geom_sf(aes(fill=count)) +
+  scale_fill_gradient(low = 'green',high = 'red' )+
+  ggtitle('Fire Incidents')
+
+```
+
+
+```{r}
+medical_volume <- data %>% rename(nhood = Neighborhooods...Analysis.Boundaries) %>% 
+  filter(data$Call.Type == 'Medical Incident') %>% group_by(nhood) %>%
+  summarise(count = n_distinct(Incident.Number))
+
+medical_volume_shp <- inner_join(sfn_shp,medical_volume)
+ggplot(medical_volume_shp) + geom_sf(aes(fill=count)) +
+  scale_fill_gradient(low = 'green',high = 'red' )+
+  ggtitle('Medical Incidents')
+```
+
+```{r}
+data <- separate(data, Location, into = c("long", "lat"), sep = ",")
+
+data$lat <- str_remove_all(data$lat,'[)]') %>% as.numeric(data$lat)
+data$long <- str_remove_all(data$long,'[(]') %>% as.numeric(data$long)
+data$Received.DtTm <- parse_date_time(data$Received.DtTm, '%m/%d/%Y %I:%M:%S %p')
+data$Entry.DtTm <- parse_date_time(data$Entry.DtTm, '%m/%d/%Y %I:%M:%S %p')
+data$Dispatch.DtTm <- parse_date_time(data$Dispatch.DtTm, '%m/%d/%Y %I:%M:%S %p')
+data$Response.DtTm <- parse_date_time(data$Response.DtTm, '%m/%d/%Y %I:%M:%S %p')
+data$On.Scene.DtTm <- parse_date_time(data$On.Scene.DtTm, '%m/%d/%Y %I:%M:%S %p')
+data$Transport.DtTm <- parse_date_time(data$Transport.DtTm, '%m/%d/%Y %I:%M:%S %p')
+data$Hospital.DtTm <- parse_date_time(data$Hospital.DtTm, '%m/%d/%Y %I:%M:%S %p')
+data$Available.DtTm <- parse_date_time(data$Available.DtTm, '%m/%d/%Y %I:%M:%S %p')
+data$disp_response_delta <- as.difftime(data$Response.DtTm - data$Dispatch.DtTm)
+
+
+
+code3_response_time <- data %>% 
+  rename(nhood = Neighborhooods...Analysis.Boundaries) %>% 
+  filter(data$Priority == '3') %>% na.omit(code3_response_time$On.Scene.DtTm)
+
+code3_response_time$response_time <- as.numeric(difftime(code3_response_time$On.Scene.DtTm, 
+                                              code3_response_time$Response.DtTm),
+                                              units = 'mins')
+
+code3_response_time$hour <- hour(code3_response_time$Dispatch.DtTm)
+
+calls_by_hour <- code3_response_time %>% group_by(hour)%>%
+  summarise(count = n_distinct(Incident.Number))
+
+```
+
+Call volume increases during the dayight hours and is consistant with a increased daytime population comprised of many outside workers. 
+
+```{r}
+ggplot(data=calls_by_hour , aes(x=hour, y=count)) +
+  geom_bar(stat="identity")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Call Volume by Time of Day") + labs(x= 'Time of Day', y='Count')
+
+```
+
+Response times also increase during the daylight hours. More investigation is required to determine weather this increase is due to increased system demand or heavy city traffic patterns. 
+
+```{r}
+
+TOD_response_time <- code3_response_time %>%
+  mutate(TOD = hour(code3_response_time$Dispatch.DtTm)) %>% 
+  group_by(TOD) %>%
+  summarise(count = mean(response_time))
+scatter.smooth(TOD_response_time$TOD,TOD_response_time$count, 
+main ='Average Response Time', ylab= 'Response Time (Minutes)', xlab= 'Time of Day')
+
+```
+
+All engine companies in San Francisco can provide Basic Life Support (BLS) services and selected companies are staffed with Paramedics, providing Advanced Life Support (ALS) services. 
+
+As we can see below, average BLS response times are extremely low, averaging around 2.5 minutes. ALS engine companies are dynamicly staffed throughout the city, on a daily basis. This allows fast response from a designated location. ALS engine companies are generally assisgned a greater coverage area, witch may be the for increased average response times. 
+
+Through this dynamic coverage system the department is able to provide much needed medical services while awaiting the arrival of a transport ambulance. 
+
+```{r}
+
+engine_ALS_medical_response_time <- code3_response_time %>% 
+  filter(code3_response_time$Call.Type == 'Medical Incident' & 
+           code3_response_time$Unit.Type == 'ENGINE' &
+           code3_response_time$ALS.Unit == 'true') %>%
+  group_by(Station.Area) %>%
+  summarise(count = mean(response_time))
+
+engine_ALS_outliers <- boxplot(engine_ALS_medical_response_time, plot=FALSE)$out
+
+engine_ALS_medical_response_time_clean <-
+  engine_ALS_medical_response_time[-which(engine_ALS_medical_response_time$count
+                                          %in% engine_ALS_outliers),]
+
+engine_BLS_medical_response_time <- code3_response_time %>% 
+  filter(code3_response_time$Call.Type == 'Medical Incident' & 
+           code3_response_time$Unit.Type == 'ENGINE' &
+           code3_response_time$ALS.Unit == 'false') %>%
+  group_by(Station.Area) %>%
+  summarise(count = mean(response_time))
+
+medic_response_time <- code3_response_time %>% 
+  filter(code3_response_time$Unit.Type == 'MEDIC' &
+           code3_response_time$Call.Type == 'Medical Incident') %>%
+  group_by(Unit.ID) %>%
+  summarise(count = mean(response_time))
+
+
+boxplot(engine_BLS_medical_response_time$count,
+        engine_ALS_medical_response_time_clean$count,
+        medic_response_time$count, 
+        names = c('BLS','ALS','AMBULANCE'),
+        main = 'Response Time by Unit Type',
+        ylab = 'Response (Minuets)')
+
+```
+
+As we can see below, ambulance response times are shortest in the geographic regions where ther tends to be a greater call volume. 
+
+```{r}
+medic_response_time_shape_prep <- code3_response_time %>% 
+  filter(code3_response_time$Unit.Type == 'MEDIC' &
+           code3_response_time$Call.Type == 'Medical Incident') %>%
+  group_by(nhood) %>%
+  summarise(Minutes = mean(response_time))
+
+
+medic_response_shp <- inner_join(sfn_shp,medic_response_time_shape_prep)
+ggplot(medic_response_shp) + geom_sf(aes(fill=Minutes)) +
+  scale_fill_gradient(low = 'green',high = 'red' )+
+  ggtitle('Ambulance Response Time')
+
+```
+
+
+Conclusion
+
+San Francisco Fire Deparments has built a system that can easily adapt to the required system load; The amazing men and women that comprise the department will continue to make advances toward improving departmental services. 
+
+Further investigation into incident location and desity using traditionaal rasterization methods may be usefull in preforming prdictive analytics over space and time; Making further improvements to dynamic ambulace deployment and response. 
+
+Socio-economic factors should also be used in futher analysis. Finding locations that would most benifit from improved community clinincs and social services may decreasing system load by providing neighborhood medical care; imporoving emergent response times while also improveing overall community health. 
+

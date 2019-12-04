@@ -43,14 +43,14 @@ Packages used
 San Francisco Fire Department, Calls for Service dataset.
 
 ```{r}
-data <- read.csv(file= "/Users/Steve/Dropbox/ucsc/data_analysis/project/Fire_Department_Calls_for_Service_2016.csv")
+data <- read.csv(file= "Fire_Department_Calls_for_Service_2016.csv")
 ```
 
 
 Shapefile deliniating neighborhood boundarys.
 
 ```{r}
-sfn_shp <- st_read('/Users/steve/Downloads/sf_nhoods/geo_export_b43d0be8-0ef5-421a-8fa0-204489a90d6b.shp')
+sfn_shp <- st_read('sf_nhoods/geo_export_b43d0be8-0ef5-421a-8fa0-204489a90d6b.shp')
 ```
 
 -Analysis
